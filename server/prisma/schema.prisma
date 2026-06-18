@@ -1,0 +1,101 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int           @id @default(autoincrement())
+  username     String        @unique
+  email        String        @unique
+  password     String
+  role         String        @default("USER")
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  posts        Post[]
+  comments     Comment[]
+  profile      Profile?
+  savedQueries SavedQuery[]
+  requestLogs  RequestLog[]
+
+  @@map("users")
+}
+
+model Profile {
+  id        Int      @id @default(autoincrement())
+  bio       String?
+  avatar    String?
+  location  String?
+  website   String?
+  phone     String?
+  userId    Int      @unique
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("profiles")
+}
+
+model Post {
+  id          Int       @id @default(autoincrement())
+  title       String
+  content     String
+  published   Boolean   @default(false)
+  viewCount   Int       @default(0)
+  authorId    Int
+  author      User      @relation(fields: [authorId], references: [id])
+  comments    Comment[]
+  tags        String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("posts")
+}
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  content   String
+  approved  Boolean  @default(false)
+  postId    Int
+  post      Post     @relation(fields: [postId], references: [id])
+  authorId  Int
+  author    User     @relation(fields: [authorId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("comments")
+}
+
+model SavedQuery {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  query       String
+  variables   String?
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("saved_queries")
+}
+
+model RequestLog {
+  id         Int      @id @default(autoincrement())
+  operation  String
+  query      String
+  variables  String?
+  result     String?
+  errors     String?
+  duration   Int
+  userId     Int?
+  user       User?    @relation(fields: [userId], references: [id])
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@map("request_logs")
+}
