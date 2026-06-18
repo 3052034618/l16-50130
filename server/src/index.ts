@@ -21,10 +21,9 @@ import { authTypeDefs, createAuthResolvers } from './resolvers/auth';
 import { adminTypeDefs, createAdminResolvers } from './resolvers/admin';
 import { scalarResolvers } from './scalars';
 import { createFieldPermissionMiddleware, filterResponseByPermissions, createResponseFilter } from './middleware/fieldPermission';
-import { createQueryDepthLimitRule, createComplexityValidationRule } from './middleware/queryComplexity';
+import { createQueryDepthLimitRule, assertQueryComplexity, calculateQueryComplexity } from './middleware/queryComplexity';
 import { initRequestLogger, logRequest, shutdownLogger } from './middleware/requestLogger';
 import { subscriptionManager } from './pubsub';
-import { calculateQueryComplexity } from './middleware/queryComplexity';
 
 const PORT = parseInt(process.env.PORT || '4000', 10);
 const MAX_QUERY_DEPTH = parseInt(process.env.MAX_QUERY_DEPTH || '10', 10);
@@ -96,7 +95,6 @@ async function main() {
     schema,
     validationRules: [
       createQueryDepthLimitRule(MAX_QUERY_DEPTH),
-      createComplexityValidationRule(MAX_QUERY_COMPLEXITY),
     ],
     plugins: [
       ApolloServerPluginDrainHttpServer({ httpServer }),
@@ -113,6 +111,11 @@ async function main() {
         requestDidStart() {
           const startTime = Date.now();
           return {
+            async didResolveOperation(requestContext: any) {
+              const { document, request } = requestContext;
+              const variables = request.variables;
+              assertQueryComplexity(document, variables, MAX_QUERY_COMPLEXITY);
+            },
             async willSendResponse(requestContext: any) {
               const { request, response, contextValue, document } = requestContext;
               const context = contextValue;
@@ -162,10 +165,6 @@ async function main() {
           };
         },
       },
-    ],
-    validationRules: [
-      createQueryDepthLimitRule(MAX_QUERY_DEPTH),
-      createComplexityValidationRule(MAX_QUERY_COMPLEXITY),
     ],
   });
 
