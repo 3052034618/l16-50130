@@ -50,7 +50,7 @@ const flushLogs = async () => {
 };
 
 export const logRequest = async (
-  context: GraphQLContext,
+  context: GraphQLContext | undefined,
   operationName: string,
   query: string,
   variables: any,
@@ -72,7 +72,7 @@ export const logRequest = async (
     result: sanitizedResult,
     errors: errors || null,
     duration,
-    userId: context.user?.id || null,
+    userId: context?.user?.id || null,
     ipAddress: ipAddress || null,
     userAgent: userAgent || null,
   });

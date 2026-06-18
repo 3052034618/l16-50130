@@ -1,4 +1,4 @@
-import { GraphQLError, DocumentNode, OperationDefinitionNode, FieldNode, SelectionSetNode } from 'graphql';
+import { GraphQLError, DocumentNode, OperationDefinitionNode, FieldNode, SelectionSetNode, ValidationContext } from 'graphql';
 import { getOperationAST } from 'graphql';
 
 interface ValidationContext {
@@ -107,11 +107,12 @@ export const createComplexityValidationRule = (maxComplexity: number) => {
   return (context: ValidationContext) => {
     return {
       OperationDefinition(node: OperationDefinitionNode) {
-        const complexity = calculateSelectionComplexity(node.selectionSet, context.getVariableValues?.() || {});
+        const variables = (context as any).variableValues || {};
+        const complexity = calculateSelectionComplexity(node.selectionSet, variables);
         if (complexity > maxComplexity) {
           context.reportError(
             new GraphQLError(
-              `Query complexity ${Math.round(complexity)} exceeds maximum allowed complexity of ${maxComplexity}`
+              `Query complexity ${Math.round(complexity)} exceeds maximum allowed complexity of ${maxComplexity}. Break your query into smaller pieces or request fewer fields.`
             )
           );
         }

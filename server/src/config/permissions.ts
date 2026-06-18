@@ -19,9 +19,9 @@ export const permissions: PermissionsConfig = {
   User: {
     id: { read: ALL_ROLES, write: ADMIN_ONLY },
     username: { read: ALL_ROLES, write: ADMIN_EDITOR_USER },
-    email: { read: ADMIN_EDITOR, write: ADMIN_EDITOR_USER },
+    email: { read: ADMIN_ONLY, write: ADMIN_EDITOR_USER },
     password: { read: ADMIN_ONLY, write: ADMIN_EDITOR_USER },
-    role: { read: ALL_ROLES, write: ADMIN_ONLY },
+    role: { read: ADMIN_ONLY, write: ADMIN_ONLY },
     createdAt: { read: ALL_ROLES, write: [] },
     updatedAt: { read: ALL_ROLES, write: [] },
     posts: { read: ALL_ROLES, write: [] },

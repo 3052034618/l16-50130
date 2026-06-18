@@ -12,6 +12,24 @@ const PRISMA_TO_GQL_TYPE: Record<string, string> = {
   JsonValue: 'JSON',
 };
 
+const FIELD_TYPE_OVERRIDES: Record<string, Record<string, { type: string; isList: boolean }>> = {
+  Post: {
+    tags: { type: 'String', isList: true },
+  },
+  SavedQuery: {
+    variables: { type: 'JSON', isList: false },
+  },
+  RequestLog: {
+    variables: { type: 'JSON', isList: false },
+    result: { type: 'JSON', isList: false },
+    errors: { type: 'JSON', isList: false },
+  },
+};
+
+const getFieldTypeOverride = (modelName: string, fieldName: string) => {
+  return FIELD_TYPE_OVERRIDES[modelName]?.[fieldName];
+};
+
 export const generateGraphQLSchema = (dmmf: DMMF.Document) => {
   const models = dmmf.datamodel.models;
   const enums = dmmf.datamodel.enums;
@@ -33,13 +51,25 @@ export const generateGraphQLSchema = (dmmf: DMMF.Document) => {
     typeDefs += `
       type ${model.name} {
         ${model.fields.map((field: any) => {
-          const type = field.kind === 'object'
-            ? field.type
-            : PRISMA_TO_GQL_TYPE[field.type] || field.type;
-          const isList = field.isList ? '[' : '';
-          const isListClose = field.isList ? ']' : '';
-          const isRequired = field.isRequired && !field.isList ? '!' : '';
-          return `${field.name}: ${isList}${type}${isListClose}${isRequired}`;
+          const override = getFieldTypeOverride(model.name, field.name);
+          let type: string;
+          let isList: boolean;
+          
+          if (override) {
+            type = override.type;
+            isList = override.isList;
+          } else if (field.kind === 'object') {
+            type = field.type;
+            isList = field.isList;
+          } else {
+            type = PRISMA_TO_GQL_TYPE[field.type] || field.type;
+            isList = field.isList;
+          }
+          
+          const isListOpen = isList ? '[' : '';
+          const isListClose = isList ? ']' : '';
+          const isRequired = field.isRequired && !isList ? '!' : '';
+          return `${field.name}: ${isListOpen}${type}${isListClose}${isRequired}`;
         }).join('\n        ')}
       }
     `;
@@ -51,20 +81,42 @@ export const generateGraphQLSchema = (dmmf: DMMF.Document) => {
     typeDefs += `
       input ${model.name}CreateInput {
         ${inputFields.map((field: any) => {
-          const type = PRISMA_TO_GQL_TYPE[field.type] || field.type;
-          const isList = field.isList ? '[' : '';
-          const isListClose = field.isList ? ']' : '';
-          const isRequired = field.isRequired && !field.hasDefaultValue ? '!' : '';
-          return `${field.name}: ${isList}${type}${isListClose}${isRequired}`;
+          const override = getFieldTypeOverride(model.name, field.name);
+          let type: string;
+          let isList: boolean;
+          
+          if (override) {
+            type = override.type;
+            isList = override.isList;
+          } else {
+            type = PRISMA_TO_GQL_TYPE[field.type] || field.type;
+            isList = field.isList;
+          }
+          
+          const isListOpen = isList ? '[' : '';
+          const isListClose = isList ? ']' : '';
+          const isRequired = field.isRequired && !field.hasDefaultValue && !isList ? '!' : '';
+          return `${field.name}: ${isListOpen}${type}${isListClose}${isRequired}`;
         }).join('\n        ')}
       }
 
       input ${model.name}UpdateInput {
         ${inputFields.map((field: any) => {
-          const type = PRISMA_TO_GQL_TYPE[field.type] || field.type;
-          const isList = field.isList ? '[' : '';
-          const isListClose = field.isList ? ']' : '';
-          return `${field.name}: ${isList}${type}${isListClose}`;
+          const override = getFieldTypeOverride(model.name, field.name);
+          let type: string;
+          let isList: boolean;
+          
+          if (override) {
+            type = override.type;
+            isList = override.isList;
+          } else {
+            type = PRISMA_TO_GQL_TYPE[field.type] || field.type;
+            isList = field.isList;
+          }
+          
+          const isListOpen = isList ? '[' : '';
+          const isListClose = isList ? ']' : '';
+          return `${field.name}: ${isListOpen}${type}${isListClose}`;
         }).join('\n        ')}
       }
 

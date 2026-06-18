@@ -11,6 +11,7 @@ import { WebSocketServer } from 'ws';
 import { useServer } from 'graphql-ws/lib/use/ws';
 import { parse } from 'graphql';
 import { Prisma } from '@prisma/client';
+import { Role } from './config/permissions';
 
 import { prisma, createContext, createSubscriptionContext } from './context';
 import { generateGraphQLSchema } from './schema/generator';
@@ -19,8 +20,8 @@ import { relationResolvers } from './resolvers/relations';
 import { authTypeDefs, createAuthResolvers } from './resolvers/auth';
 import { adminTypeDefs, createAdminResolvers } from './resolvers/admin';
 import { scalarResolvers } from './scalars';
-import { createFieldPermissionMiddleware } from './middleware/fieldPermission';
-import { createQueryDepthLimitRule } from './middleware/queryComplexity';
+import { createFieldPermissionMiddleware, filterResponseByPermissions, createResponseFilter } from './middleware/fieldPermission';
+import { createQueryDepthLimitRule, createComplexityValidationRule } from './middleware/queryComplexity';
 import { initRequestLogger, logRequest, shutdownLogger } from './middleware/requestLogger';
 import { subscriptionManager } from './pubsub';
 import { calculateQueryComplexity } from './middleware/queryComplexity';
@@ -93,6 +94,10 @@ async function main() {
 
   const server = new ApolloServer({
     schema,
+    validationRules: [
+      createQueryDepthLimitRule(MAX_QUERY_DEPTH),
+      createComplexityValidationRule(MAX_QUERY_COMPLEXITY),
+    ],
     plugins: [
       ApolloServerPluginDrainHttpServer({ httpServer }),
       {
@@ -109,16 +114,29 @@ async function main() {
           const startTime = Date.now();
           return {
             async willSendResponse(requestContext: any) {
-              const { request, response, context } = requestContext;
+              const { request, response, contextValue, document } = requestContext;
+              const context = contextValue;
               const operationName = request.operationName || 'unknown';
               const query = request.query || '';
               const variables = request.variables;
               
               try {
-                const document = parse(query);
-                const complexity = calculateQueryComplexity(document, variables);
+                const complexity = calculateQueryComplexity(document || parse(query), variables);
                 console.log(`[${operationName}] complexity: ${Math.round(complexity)}`);
               } catch (e) {}
+              
+              if (response.body?.singleResult?.data) {
+                const userRole = context?.user?.role || Role.VIEWER;
+                try {
+                  const filterResponse = createResponseFilter(document);
+                  response.body.singleResult.data = filterResponse(
+                    response.body.singleResult.data,
+                    userRole
+                  );
+                } catch (e) {
+                  console.error('Error filtering response:', e);
+                }
+              }
 
               const errors = response.errors?.map((e: any) => ({
                 message: e.message,
@@ -147,6 +165,7 @@ async function main() {
     ],
     validationRules: [
       createQueryDepthLimitRule(MAX_QUERY_DEPTH),
+      createComplexityValidationRule(MAX_QUERY_COMPLEXITY),
     ],
   });
 
